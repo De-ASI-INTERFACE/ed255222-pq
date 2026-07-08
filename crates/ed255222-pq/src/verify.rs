@@ -2,7 +2,8 @@
 //!
 //! Spec reference: Section 6 of draft-patterson-cfrg-ed255222-pq-00
 
-use ml_dsa::{MlDsa44, EncodedVerifyingKey, VerifyingKey, EncodedSignature};
+use fips204::ml_dsa_44::{self, PublicKey as MlPk};
+use fips204::traits::{SerDes, Verifier};
 use sha3::{Shake256, digest::{Update, ExtendableOutput, XofReader}};
 
 use crate::constants::*;
@@ -11,14 +12,12 @@ use crate::keypair::PublicKey;
 
 /// Verify an ED255222-PQ signature.
 ///
-/// # Arguments
-/// * `pk`        - 1312-byte public key
-/// * `message`   - original message
-/// * `signature` - 2420-byte signature
-/// * `context`   - same context used during signing, max 255 bytes
+/// Reconstructs the same m_hash as sign() and passes it to ML-DSA-44 verify.
 ///
-/// # Returns
-/// `Ok(())` on valid signature; `Err` on any rejection condition.
+/// # Rejection conditions (all return Err)
+/// - context.len() > 255
+/// - ML-DSA-44 verify returns false
+/// - Invalid key or signature encoding
 pub fn verify(
     pk: &PublicKey,
     message: &[u8],
@@ -30,28 +29,28 @@ pub fn verify(
     }
 
     // Reconstruct m_hash identically to sign().
-    let ctx_len_byte = [context.len() as u8];
     let mut m_hash = [0u8; 64];
-    let mut hasher = Shake256::default();
-    hasher.update(DST_SIGN);
-    hasher.update(&ctx_len_byte);
-    hasher.update(context);
-    hasher.update(message);
-    let mut xof = hasher.finalize_xof();
-    xof.read(&mut m_hash);
+    {
+        let mut h = Shake256::default();
+        h.update(DST_SIGN);
+        h.update(&[context.len() as u8]);
+        h.update(context);
+        h.update(message);
+        let mut xof = h.finalize_xof();
+        xof.read(&mut m_hash);
+    }
 
-    // Decode verifying key.
-    let vk_enc = EncodedVerifyingKey::<MlDsa44>::try_from(pk.0.as_ref())
-        .map_err(|_| Ed255222PQError::InvalidPublicKeyLength)?;
-    let verifying_key = VerifyingKey::try_from(&vk_enc)
+    // Deserialize public key.
+    let ml_pk = MlPk::try_from_bytes(&pk.0)
         .map_err(|_| Ed255222PQError::InvalidPublicKeyLength)?;
 
-    // Decode signature.
-    let sig_enc = EncodedSignature::<MlDsa44>::try_from(signature.as_ref())
-        .map_err(|_| Ed255222PQError::InvalidSignatureLength)?;
-    let sig = ml_dsa::Signature::try_from(&sig_enc)
+    // ML-DSA-44 verification.
+    let valid = ml_pk.verify(&m_hash, signature, b"")
         .map_err(|_| Ed255222PQError::VerificationFailed)?;
 
-    verifying_key.verify(&m_hash, &sig)
-        .map_err(|_| Ed255222PQError::VerificationFailed)
+    if valid {
+        Ok(())
+    } else {
+        Err(Ed255222PQError::VerificationFailed)
+    }
 }

@@ -6,13 +6,16 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-ml-dsa      = "0.1.1"   # RustCrypto pure-Rust ML-DSA (FIPS 204) — pin >= 0.1.1 (CVE-2026-24850)
-sha3        = "0.10"
-rand        = "0.9"
-zeroize     = { version = "1", features = ["derive"] }
-thiserror   = "2"
-borsh       = "1"
-hex         = "0.4"
-serde       = { version = "1", features = ["derive"] }
-serde_json  = "1"
-ed25519-dalek = "2"
+# fips204: pure-Rust FIPS 204 ML-DSA. Confirmed working API as of 2026-07.
+# ml-dsa (RustCrypto) 0.1.1 was published 2026-06-05 but has unstable API surface;
+# fips204 has a stable, documented API matching FIPS 204 exactly.
+fips204         = "0.9"
+sha3            = "0.10"
+rand            = "0.9"
+zeroize         = { version = "1", features = ["derive"] }
+thiserror       = "2"
+borsh           = "1"
+hex             = "0.4"
+serde           = { version = "1", features = ["derive"] }
+serde_json      = "1"
+ed25519-dalek   = "2"

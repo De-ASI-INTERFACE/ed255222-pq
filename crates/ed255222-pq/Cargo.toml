@@ -7,7 +7,7 @@ license     = "MIT OR Apache-2.0"
 repository  = "https://github.com/De-ASI-INTERFACE/ed255222-pq"
 
 [dependencies]
-ml-dsa          = { workspace = true }
+fips204         = { workspace = true }
 sha3            = { workspace = true }
 rand            = { workspace = true }
 zeroize         = { workspace = true }
@@ -22,3 +22,7 @@ serde_json      = { workspace = true }
 [[bin]]
 name = "generate-vectors"
 path = "src/bin/generate_vectors.rs"
+
+[[bin]]
+name = "benchmark"
+path = "src/bin/benchmark.rs"
