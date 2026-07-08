@@ -1,0 +1,6 @@
+name = "ED255222PQ"
+version = "0.1.0"
+lean = "v4.15.0"
+
+[[lean_lib]]
+name = "ED255222PQ"

@@ -1,0 +1,16 @@
+[package]
+name        = "ed255222-pq-solana"
+version     = "0.1.0"
+edition     = "2021"
+description = "Solana on-chain verification program for ED255222-PQ hybrid signatures"
+license     = "MIT OR Apache-2.0"
+repository  = "https://github.com/De-ASI-INTERFACE/ed255222-pq"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+ed255222-pq     = { path = "../ed255222-pq" }
+borsh           = { workspace = true }
+solana-program  = "2"
+thiserror       = { workspace = true }

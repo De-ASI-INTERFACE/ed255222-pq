@@ -1,0 +1,157 @@
+Internet-Draft                                         R. Patterson
+draft-patterson-cfrg-ed255222-pq-00                    Independent
+Category: Informational                                July 7, 2026
+ISSN: 2070-1721
+
+   ED255222-PQ: A Post-Quantum Signature Profile Based on ML-DSA-44
+
+Abstract
+
+   ED255222-PQ is a post-quantum digital signature scheme and profile
+   of the Module-Lattice-Based Digital Signature Standard (ML-DSA,
+   FIPS 204), designed as an architectural replacement for Ed25519 in
+   high-throughput distributed ledgers.  The primary reference
+   implementation and integration specifications target the Solana
+   blockchain.  The scheme defines key generation, signing,
+   verification, domain separation, a hybrid Ed25519+PQ construction,
+   test vectors, and a Solana program interface.  ED255222-PQ inherits
+   the security properties of ML-DSA-44 (NIST security category 2)
+   and is resistant to known quantum and AI-assisted cryptanalytic
+   attacks.
+
+Status of This Memo
+
+   This document is an Internet-Draft submitted to IETF CFRG.
+   Internet-Drafts are working documents.  This draft expires
+   January 7, 2027.
+
+Author
+
+   Richard Patterson
+   GitHub: https://github.com/De-ASI-INTERFACE
+   Repository: https://github.com/De-ASI-INTERFACE/ed255222-pq
+
+1.  Introduction
+
+   Ed25519 [RFC8032] underpins transaction signing across Solana and
+   related ledgers.  Quantum computers executing Shor's algorithm
+   would break Ed25519 by solving the elliptic curve discrete
+   logarithm in polynomial time.  Recent research (INRIA, 2026)
+   estimates 1,193 logical qubits suffice to break 256-bit ECC,
+   materially compressing the quantum threat timeline.  Additionally,
+   AI-assisted cryptanalysis introduces novel classical risk vectors
+   that are difficult to bound.
+
+   ED255222-PQ addresses this by providing:
+   - A named, versioned, RFC-style specification.
+   - Security grounded in module lattice hardness (ML-DSA, FIPS 204).
+   - Domain separation specific to distributed ledger use cases.
+   - A hybrid construction for zero-downtime migration.
+   - Lean 4 formal verification of core correctness properties.
+   - A Solana on-chain verification program.
+
+2.  Notation and Conventions
+
+   SEED_LEN = 32, PK_LEN = 1312, SK_LEN = 2560, SIG_LEN = 2420
+   MAX_CTX = 255
+   DST_KEYGEN = "ED255222-PQ-KEYGEN" (ASCII)
+   DST_SIGN   = "ED255222-PQ-SIGN"   (ASCII)
+   H(x, L)    = SHAKE256(x)[0..L]
+   ||         = byte concatenation
+   MLDSA44    = ML-DSA-44 as in FIPS 204
+
+3.  Parameters (ML-DSA-44, FIPS 204)
+
+   Parameter Set   : ML-DSA-44 (NIST category 2)
+   Public key      : 1312 bytes
+   Secret key      : 2560 bytes
+   Signature       : 2420 bytes
+   Hash/XOF        : SHAKE256
+   Classical sec.  : ~128-bit
+   PQ security     : NIST category 2
+
+4.  Key Generation
+
+   ED255222_PQ_KeyGen() -> (sk, pk)
+   1. seed     <- RandomOctets(32)
+   2. seed_exp <- H(DST_KEYGEN || seed, 32)
+   3. (sk, pk) <- MLDSA44.KeyGen(seed_exp)
+   4. Return (sk, pk)
+
+5.  Signing
+
+   ED255222_PQ_Sign(sk, message, context) -> signature
+   1. Reject if len(context) > 255
+   2. pre    <- DST_SIGN || byte(len(context)) || context
+   3. m_hash <- H(pre || message, 64)
+   4. sig    <- MLDSA44.Sign(sk, m_hash)
+   5. Return sig
+
+6.  Verification
+
+   ED255222_PQ_Verify(pk, message, signature, context) -> bool
+   1. Reject if len(pk)!=1312, len(sig)!=2420, len(ctx)>255
+   2. pre    <- DST_SIGN || byte(len(context)) || context
+   3. m_hash <- H(pre || message, 64)
+   4. Return MLDSA44.Verify(pk, m_hash, signature)
+
+7.  Hybrid Construction (Ed25519 + ED255222-PQ)
+
+   HYBRID_Sign((sk_e,sk_p), msg, ctx):
+     sig_e <- Ed25519_Sign(sk_e, msg)
+     sig_p <- ED255222_PQ_Sign(sk_p, msg, ctx)
+     Return (sig_e, sig_p)  [64 + 2420 = 2484 bytes]
+
+   HYBRID_Verify((pk_e,pk_p), msg, (sig_e,sig_p), ctx):
+     Return Ed25519_Verify(pk_e,msg,sig_e)
+        AND ED255222_PQ_Verify(pk_p,msg,sig_p,ctx)
+
+   Security: EUF-CMA if at least one component is EUF-CMA secure.
+
+8.  Test Vectors
+
+   See: https://github.com/De-ASI-INTERFACE/ed255222-pq/test-vectors/
+   Run: cargo run --bin generate-vectors
+
+9.  Security Considerations
+
+   ED255222-PQ inherits ML-DSA-44 security assumptions (MLWE, MSIS).
+   It is resistant to Shor's algorithm and known AI-assisted classical
+   attacks.  Implementations MUST be constant-time.  CVE-2026-24850
+   (ml-dsa < 0.1.1, duplicate hint indices) must be mitigated by
+   pinning ml-dsa >= 0.1.1.  Hybrid mode is secure if either
+   component remains EUF-CMA secure.
+
+10. Implementation Considerations
+
+   Constant-time arithmetic required for all secret-dependent ops.
+   Zeroize all secret key material post-use.  Verify against official
+   NIST FIPS 204 test vectors prior to production deployment.
+   Reference: https://qnsp.cuilabs.io/verify/conformance
+
+11. Appendix A: Solana Integration
+
+   Program: ed255222-pq-solana
+   Account: HybridSignerV1 (1346 bytes)
+     version:    u8  (= 1)
+     ed25519_pk: [u8; 32]
+     pq_pk:      [u8; 1312]
+     phase:      u8  (1=Hybrid, 2=PQ-Only)
+
+   Instructions:
+     CreateHybridSigner { ed25519_pk, pq_pk }
+     VerifyHybrid { message, ed25519_sig, pq_sig, context }
+     UpgradeToPQOnly { auth_pq_sig }
+
+   Phase 1 (Hybrid): Both sigs required. Program-only, non-breaking.
+   Phase 2 (PQ-Only): Runtime SIMD required.
+
+12. References
+
+   [FIPS204]     NIST FIPS 204, August 2024.
+   [RFC8032]     Josefsson & Liusvaara, January 2017.
+   [RFC9881]     ML-DSA Algorithm Identifiers, 2025.
+   [HYBRID-SIGS] draft-prabel-cfrg-suf-hybrid-sigs-00, 2025.
+   [INRIA2026]   INRIA, Reduced qubit estimates for ECC, 2026.
+   [ANZA2026]    Anza, Securing Solana Against Quantum, May 2026.
+   [HELIUS2025]  Helius, Solana Post-Quantum Cryptography, Dec 2025.

@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "scheme": "ED255222-PQ",
+  "base": "ML-DSA-44 (FIPS 204)",
+  "dst_keygen": "ED255222-PQ-KEYGEN",
+  "dst_sign": "ED255222-PQ-SIGN",
+  "author": "Richard Patterson",
+  "date": "2026-07-07",
+  "note": "Run `cargo run --bin generate-vectors` to populate real ML-DSA-44 signed vectors.",
+  "vectors": [
+    {
+      "name": "ED255222-PQ-TV-1",
+      "seed": "0101010101010101010101010101010101010101010101010101010101010101",
+      "context": "SOLANA-TX",
+      "message": "54657374206d657373616765",
+      "comment": "Basic sign/verify round-trip",
+      "valid": true,
+      "public_key": "<run generate-vectors>",
+      "signature": "<run generate-vectors>"
+    },
+    {
+      "name": "ED255222-PQ-TV-2",
+      "seed": "0202020202020202020202020202020202020202020202020202020202020202",
+      "context": "IDENTITY",
+      "message": "",
+      "comment": "Empty message",
+      "valid": true,
+      "public_key": "<run generate-vectors>",
+      "signature": "<run generate-vectors>"
+    },
+    {
+      "name": "ED255222-PQ-TV-3",
+      "seed": "0303030303030303030303030303030303030303030303030303030303030303",
+      "context": "MESSAGE",
+      "message": "526963686172642050617474657273616f6e202d2045443235353232322d5051",
+      "comment": "Author signing",
+      "valid": true,
+      "public_key": "<run generate-vectors>",
+      "signature": "<run generate-vectors>"
+    },
+    {
+      "name": "ED255222-PQ-TV-4-TAMPERED",
+      "seed": "0101010101010101010101010101010101010101010101010101010101010101",
+      "context": "SOLANA-TX",
+      "message": "54657374206d657373616765",
+      "comment": "First byte of TV-1 signature flipped — MUST be invalid",
+      "valid": false,
+      "public_key": "<same as TV-1>",
+      "signature": "<TV-1 sig with byte[0] XOR 0xff>"
+    }
+  ]
+}
